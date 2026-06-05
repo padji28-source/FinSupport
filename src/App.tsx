@@ -864,28 +864,75 @@ export default function App() {
         <div className="w-full h-screen sm:h-[850px] sm:max-h-[90vh] sm:max-w-[400px] flex flex-col relative bg-blue-900 sm:rounded-[40px] sm:overflow-hidden sm:shadow-2xl">
             <motion.div
               initial={{ opacity: 1 }}
-              exit={{ opacity: 0, filter: "blur(10px)", transition: { duration: 0.5 } }}
-              className="absolute inset-0 z-[100] bg-blue-900 flex flex-col items-center justify-center text-white"
+              exit={{ opacity: 0, scale: 1.1, filter: "blur(10px)", transition: { duration: 0.6, ease: "easeInOut" } }}
+              className="absolute inset-0 z-[100] bg-gradient-to-b from-blue-800 to-blue-950 flex flex-col items-center justify-center text-white overflow-hidden"
             >
+              {/* Background decorative elements */}
               <motion.div 
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ type: "spring", stiffness: 200, damping: 20 }}
-                className="w-24 h-24 bg-white/10 rounded-3xl backdrop-blur-sm flex items-center justify-center mb-6 shadow-2xl border border-white/20 p-2"
+                initial={{ opacity: 0, scale: 0 }}
+                animate={{ opacity: 0.3, scale: 1 }}
+                transition={{ duration: 1.5, ease: "easeOut" }}
+                className="absolute w-[500px] h-[500px] bg-blue-500/20 rounded-full blur-3xl -top-20 -left-20"
+              />
+              <motion.div 
+                initial={{ opacity: 0, scale: 0 }}
+                animate={{ opacity: 0.2, scale: 1 }}
+                transition={{ duration: 1.5, ease: "easeOut", delay: 0.2 }}
+                className="absolute w-[400px] h-[400px] bg-indigo-500/20 rounded-full blur-3xl -bottom-20 -right-20"
+              />
+
+              <motion.div 
+                initial={{ scale: 0.5, opacity: 0, rotate: -10, y: 20 }}
+                animate={{ scale: 1, opacity: 1, rotate: 0, y: 0 }}
+                transition={{ 
+                  type: "spring", 
+                  stiffness: 260, 
+                  damping: 20, 
+                  duration: 0.8 
+                }}
+                className="w-28 h-28 bg-white/10 rounded-[32px] backdrop-blur-md flex items-center justify-center mb-8 shadow-2xl border border-white/20 p-3 relative z-10"
               >
-                <img src="/fk.png" alt="FinancialKita" className="w-full h-full object-contain" />
+                <motion.div
+                  animate={{ 
+                    boxShadow: ["0px 0px 0px 0px rgba(255,255,255,0)", "0px 0px 40px 10px rgba(255,255,255,0.1)", "0px 0px 0px 0px rgba(255,255,255,0)"]
+                  }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                  className="absolute inset-0 rounded-[32px]"
+                />
+                <img src="/fk.png" alt="FinancialKita" className="w-full h-full object-contain relative z-10" />
               </motion.div>
-              <h1 className="text-3xl font-black mb-2 tracking-tight">FinancialKita</h1>
-              <p className="text-blue-200 text-sm font-medium tracking-wide">Pencatatan Keuangan Keluarga</p>
               
-              <div className="absolute bottom-10 flex flex-col items-center gap-2">
-                <div className="flex gap-1.5">
+              <motion.h1 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.3, ease: "easeOut" }}
+                className="text-4xl font-black mb-3 tracking-tight relative z-10"
+              >
+                FinancialKita
+              </motion.h1>
+              
+              <motion.p 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.4, ease: "easeOut" }}
+                className="text-blue-200 text-sm font-medium tracking-wide relative z-10"
+              >
+                Pencatatan Keuangan Keluarga
+              </motion.p>
+              
+              <div className="absolute bottom-12 flex flex-col items-center gap-2 z-10">
+                <div className="flex gap-2">
                   {[0,1,2].map(i => (
                     <motion.div 
                       key={i}
-                      animate={{ y: [0, -6, 0] }}
-                      transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
-                      className="w-2.5 h-2.5 rounded-full bg-white/40"
+                      initial={{ opacity: 0, scale: 0.5 }}
+                      animate={{ opacity: 1, scale: 1, y: [0, -8, 0] }}
+                      transition={{ 
+                        y: { duration: 0.8, repeat: Infinity, delay: i * 0.15, ease: "easeInOut" },
+                        opacity: { duration: 0.3, delay: 0.6 + (i * 0.1) },
+                        scale: { duration: 0.3, delay: 0.6 + (i * 0.1) }
+                      }}
+                      className="w-2.5 h-2.5 rounded-full bg-blue-300 shadow-[0_0_8px_rgba(147,197,253,0.5)]"
                     />
                   ))}
                 </div>
