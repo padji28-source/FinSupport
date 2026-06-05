@@ -72,8 +72,11 @@ service cloud.firestore {
 
     // Auth Helpers
     function isMemberOfLedger(lId) {
-      let ledgerPath = /databases/$(database)/documents/ledgers/$(lId);
-      return exists(ledgerPath) && request.auth.uid in get(ledgerPath).data.memberIds;
+      return exists(/databases/$(database)/documents/ledgers/$(lId)) &&
+             (
+               ('memberIds' in get(/databases/$(database)/documents/ledgers/$(lId)).data && request.auth.uid in get(/databases/$(database)/documents/ledgers/$(lId)).data.memberIds) ||
+               ('ownerId' in get(/databases/$(database)/documents/ledgers/$(lId)).data && request.auth.uid == get(/databases/$(database)/documents/ledgers/$(lId)).data.ownerId)
+             );
     }
 
     function isLedgerOwner(ledgerData) {

@@ -8,7 +8,7 @@ import { id } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth, db as firestoreDb, signInWithGoogle, logout } from './firebase';
-import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, arrayUnion, serverTimestamp, deleteDoc, orderBy, getDocs, getDoc, deleteField, writeBatch } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, arrayUnion, arrayRemove, serverTimestamp, deleteDoc, orderBy, getDocs, getDoc, deleteField, writeBatch } from 'firebase/firestore';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -41,6 +41,7 @@ interface SavingsGoal {
   targetAmt: number;
   currentAmt: number;
   deadline: string;
+  history?: { id?: string; date: string; amount: number }[];
 }
 
 const catStyles: Record<string, string> = {
@@ -98,8 +99,8 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
     operationType,
     path
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  console.error('Firestore Error: ', JSON.stringify(errInfo, null, 2));
+  // Not throwing anymore to prevent unhandled rejections that crash the UI
 }
 
 export default function App() {
@@ -138,6 +139,10 @@ export default function App() {
   // Savings Input State
   const [savingsInput, setSavingsInput] = useState({ name: '', targetAmt: '', deadline: '' });
   const [addSavingsAmt, setAddSavingsAmt] = useState('');
+  const [addSavingsDate, setAddSavingsDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [editSavingsHistModal, setEditSavingsHistModal] = useState<{show: boolean, goalId: string | null, historyItem: any | null}>({show: false, goalId: null, historyItem: null});
+  const [editSavingsHistAmt, setEditSavingsHistAmt] = useState('');
+  const [editSavingsHistDate, setEditSavingsHistDate] = useState('');
 
   const [reportTime, setReportTime] = useState<'ini' | 'lalu'>('ini');
   const [statsViewType, setStatsViewType] = useState<'bulan' | 'tahun'>('bulan');
@@ -544,12 +549,65 @@ export default function App() {
     const goal = savingsGoals.find(g => g.id === showAddSavingsAmtModal.goalId);
     if (!goal) return;
 
+    const newHistoryItem = { id: Date.now().toString() + Math.random().toString(36).substr(2, 5), date: addSavingsDate, amount: amount };
+
     await updateDoc(doc(firestoreDb, `ledgers/${selectedLedgerId}/savings_goals/${goal.id}`), {
-      currentAmt: goal.currentAmt + amount
+      currentAmt: goal.currentAmt + amount,
+      history: arrayUnion(newHistoryItem)
     });
 
     setAddSavingsAmt('');
+    setAddSavingsDate(format(new Date(), 'yyyy-MM-dd'));
     setShowAddSavingsAmtModal({ show: false, goalId: null });
+  };
+
+  const handleDeleteSavingsHistory = async (goalId: string, historyItem: any) => {
+    if (!selectedLedgerId || !confirm("Yakin ingin menghapus riwayat tabungan ini? Saldo akan disesuaikan.")) return;
+    const goal = savingsGoals.find(g => g.id === goalId);
+    if (!goal) return;
+    try {
+      await updateDoc(doc(firestoreDb, `ledgers/${selectedLedgerId}/savings_goals/${goal.id}`), {
+        currentAmt: goal.currentAmt - historyItem.amount,
+        history: arrayRemove(historyItem)
+      });
+      setToast({ show: true, msg: 'Riwayat tabungan berhasil dihapus' });
+      setTimeout(() => setToast({ show: false, msg: '' }), 2500);
+    } catch (e: any) {
+      alert("Gagal menghapus riwayat: " + e.message);
+    }
+  };
+
+  const handleEditSavingsHistory = async () => {
+    if (!editSavingsHistAmt || !editSavingsHistModal.goalId || !editSavingsHistModal.historyItem || !selectedLedgerId) return;
+    const newAmount = parseInt(editSavingsHistAmt);
+    const newDate = editSavingsHistDate;
+    
+    const goal = savingsGoals.find(g => g.id === editSavingsHistModal.goalId);
+    if (!goal) return;
+
+    const oldItem = editSavingsHistModal.historyItem;
+    const diff = newAmount - oldItem.amount;
+
+    // Remove old item exactly, add new item
+    const newItem = { ...oldItem, amount: newAmount, date: newDate };
+
+    // To prevent duplicate elements and issues, update the whole list
+    const newHistoryList = (goal.history || []).map((h: any) => 
+      // If items have ID, match by ID; else match original oldItem ref/value
+      (oldItem.id && h.id && h.id === oldItem.id) || h === oldItem ? newItem : h
+    );
+
+    try {
+      await updateDoc(doc(firestoreDb, `ledgers/${selectedLedgerId}/savings_goals/${goal.id}`), {
+        currentAmt: goal.currentAmt + diff,
+        history: newHistoryList
+      });
+      setToast({ show: true, msg: 'Riwayat tabungan berhasil diubah' });
+      setTimeout(() => setToast({ show: false, msg: '' }), 2500);
+      setEditSavingsHistModal({ show: false, goalId: null, historyItem: null });
+    } catch (e: any) {
+      alert("Gagal mengupdate: " + e.message);
+    }
   };
 
   const navigateToPage = (page: 'home' | 'report' | 'add' | 'stats' | 'history' | 'plans' | 'savings' | 'credits') => {
@@ -1795,10 +1853,38 @@ export default function App() {
 
                     <button 
                       onClick={() => setShowAddSavingsAmtModal({ show: true, goalId: goal.id })}
-                      className="w-full py-2.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-xl font-black text-xs transition-colors flex items-center justify-center gap-2"
+                      className="w-full py-2.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-xl font-black text-xs transition-colors flex items-center justify-center gap-2 mb-4"
                     >
                       <PlusCircle className="w-3.5 h-3.5" /> TAMBAH SALDO
                     </button>
+
+                    {goal.history && goal.history.length > 0 && (
+                      <div className="mt-4 border-t border-slate-100 pt-3">
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2">Riwayat Tabungan</p>
+                        <div className="space-y-2 max-h-32 overflow-y-auto pr-2">
+                          {[...goal.history].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((h, i) => (
+                            <div key={i} className="flex justify-between items-center text-xs group cursor-pointer hover:bg-slate-50 p-1.5 -mx-1.5 rounded-lg transition-colors">
+                              <span className="text-gray-500 font-medium">{format(new Date(h.date), 'dd MMM yyyy', {locale: id})}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-indigo-600">+Rp {h.amount.toLocaleString('id-ID')}</span>
+                                <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button onClick={() => {
+                                    setEditSavingsHistAmt(h.amount.toString());
+                                    setEditSavingsHistDate(h.date);
+                                    setEditSavingsHistModal({ show: true, goalId: goal.id, historyItem: h });
+                                  }} className="text-blue-500 hover:text-blue-600">
+                                    <Edit2 className="w-3 h-3" />
+                                  </button>
+                                  <button onClick={() => handleDeleteSavingsHistory(goal.id, h)} className="text-red-500 hover:text-red-600">
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -2501,6 +2587,19 @@ export default function App() {
                 </div>
               </div>
 
+              <div className="flex flex-col gap-1.5 border border-indigo-100/50 p-4 rounded-2xl bg-indigo-50/50">
+                <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider mb-1">Tanggal</p>
+                <div className="flex items-center">
+                  <CalendarDays className="w-5 h-5 text-indigo-300 mr-2" />
+                  <input
+                    type="date"
+                    value={addSavingsDate}
+                    onChange={(e) => setAddSavingsDate(e.target.value)}
+                    className="w-full bg-transparent text-gray-800 font-bold focus:outline-none"
+                  />
+                </div>
+              </div>
+
               <div className="flex gap-3 justify-end mt-2">
                 <button 
                   onClick={() => { setShowAddSavingsAmtModal({ show: false, goalId: null }); setAddSavingsAmt(''); }}
@@ -2513,6 +2612,78 @@ export default function App() {
                   className="px-6 py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg"
                 >
                   Tambah
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Savings History Modal */}
+      <AnimatePresence>
+        {editSavingsHistModal.show && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.95, y: 10 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: -10 }}
+              className="bg-white w-full max-w-sm rounded-[32px] p-6 shadow-2xl flex flex-col gap-5"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-2xl flex items-center justify-center">
+                  <Edit2 className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-800">Edit Riwayat</h3>
+                  <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wide">Ubah nominal/tanggal</p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5 border border-blue-100/50 p-4 rounded-2xl bg-blue-50/50">
+                <div className="flex items-center">
+                  <span className="font-black text-xl text-blue-300 mr-2">Rp</span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={editSavingsHistAmt}
+                    onChange={(e) => setEditSavingsHistAmt(e.target.value)}
+                    className="w-full bg-transparent text-3xl font-black text-gray-800 focus:outline-none placeholder:text-gray-300"
+                    placeholder="0"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5 border border-blue-100/50 p-4 rounded-2xl bg-blue-50/50">
+                <p className="text-[10px] text-blue-400 font-bold uppercase tracking-wider mb-1">Tanggal</p>
+                <div className="flex items-center">
+                  <CalendarDays className="w-5 h-5 text-blue-300 mr-2" />
+                  <input
+                    type="date"
+                    value={editSavingsHistDate}
+                    onChange={(e) => setEditSavingsHistDate(e.target.value)}
+                    className="w-full bg-transparent text-gray-800 font-bold focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 justify-end mt-2">
+                <button 
+                  onClick={() => setEditSavingsHistModal({ show: false, goalId: null, historyItem: null })}
+                  className="px-5 py-3 rounded-xl text-sm font-bold text-gray-500 hover:bg-gray-100 transition-colors"
+                >
+                  Batal
+                </button>
+                <button 
+                  onClick={handleEditSavingsHistory}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-xl text-sm font-bold shadow-lg"
+                >
+                  Simpan
                 </button>
               </div>
             </motion.div>
