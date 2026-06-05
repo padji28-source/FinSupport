@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+@theme {
+  --color-blue-dark: #1e3a8a;
+  --color-blue-mid: #2563eb;
+  --color-suami: #3b82f6;
+  --color-istri: #ec4899;
+}
+
+body {
+  background-color: var(--color-blue-dark);
+  font-family: sans-serif;
+  overflow: hidden;
+}
+
+@media (min-width: 640px) {
+  body {
+    background-color: #f1f5f9; /* slate-100 */
+  }
+}
+
+.content-area {
+  -webkit-overflow-scrolling: touch;
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}

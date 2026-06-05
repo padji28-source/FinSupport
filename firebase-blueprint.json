@@ -1,0 +1,60 @@
+{
+  "entities": {
+    "Ledger": {
+      "title": "Ledger",
+      "description": "A shared financial recording book",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the ledger" },
+        "ownerId": { "type": "string", "description": "UID of the creator/owner" },
+        "monthlyBudget": { "type": "number", "description": "Monthly target budget" },
+        "memberIds": { "type": "array", "items": { "type": "string" }, "description": "Array of user UIDs who have access" },
+        "createdAt": { "type": "integer" }
+      },
+      "required": ["name", "ownerId", "monthlyBudget", "memberIds", "createdAt"]
+    },
+    "Member": {
+      "title": "Member",
+      "description": "A member of a ledger",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "role": { "type": "string", "enum": ["owner", "editor"] },
+        "addedAt": { "type": "integer" }
+      },
+      "required": ["uid", "role", "addedAt"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "A financial transaction",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "description": "Date of transaction YYYY-MM-DD" },
+        "amt": { "type": "number" },
+        "desc": { "type": "string" },
+        "cat": { "type": "string" },
+        "type": { "type": "string", "enum": ["pemasukan", "pengeluaran"] },
+        "user": { "type": "string" },
+        "paymentMethod": { "type": "string", "enum": ["tunai", "kredit"], "description": "Metode pembayaran" },
+        "isPaid": { "type": "boolean", "description": "Status pembayaran untuk kredit" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "integer" }
+      },
+      "required": ["date", "amt", "desc", "cat", "type", "user", "createdBy", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/ledgers/{ledgerId}": {
+      "schema": { "$ref": "#/entities/Ledger" },
+      "description": "Ledgers a user can access"
+    },
+    "/ledgers/{ledgerId}/members/{memberId}": {
+      "schema": { "$ref": "#/entities/Member" },
+      "description": "Members that have access to the ledger"
+    },
+    "/ledgers/{ledgerId}/transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/Transaction" },
+      "description": "Transactions inside the ledger"
+    }
+  }
+}

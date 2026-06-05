@@ -1,0 +1,142 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isVerified() {
+      return isSignedIn();
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+    
+    // Ledger Validation
+    function isValidLedger(data) {
+      return data.keys().hasAll(['name', 'ownerId', 'monthlyBudget', 'memberIds', 'createdAt']) &&
+             data.size() == 5 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.ownerId == request.auth.uid &&
+             data.monthlyBudget is number && data.monthlyBudget >= 0 &&
+             data.memberIds is list && data.memberIds.size() > 0 && data.memberIds.size() <= 50 &&
+             data.memberIds[0] is string && data.memberIds[0] == request.auth.uid &&
+             data.createdAt == request.time;
+    }
+
+    function isLedgerUpdateValid(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.monthlyBudget is number && data.monthlyBudget >= 0 &&
+             data.memberIds is list && data.memberIds.size() > 0 && data.memberIds.size() <= 50 &&
+             data.memberIds[0] is string; // First element must be string as a simple type check
+    }
+
+    // Transaction Validation
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['date', 'amt', 'desc', 'cat', 'type', 'user', 'createdBy', 'createdAt']) &&
+             data.date is string && data.date.size() <= 20 &&
+             data.amt is number && data.amt >= 0 &&
+             data.desc is string && data.desc.size() <= 500 &&
+             data.cat is string && data.cat.size() <= 100 &&
+             data.type in ['pemasukan', 'pengeluaran'] &&
+             (!('paymentMethod' in data) || data.paymentMethod == null || data.paymentMethod in ['tunai', 'kredit']) &&
+             (!('isPaid' in data) || data.isPaid == null || data.isPaid is bool) &&
+             data.user is string && data.user.size() <= 100 &&
+             data.createdBy == request.auth.uid &&
+             data.createdAt == request.time;
+    }
+
+    function isTransactionUpdateValid(data) {
+      return (!('date' in data) || data.date == null || (data.date is string && data.date.size() <= 20)) &&
+             (!('amt' in data) || data.amt == null || (data.amt is number && data.amt >= 0)) &&
+             (!('desc' in data) || data.desc == null || (data.desc is string && data.desc.size() <= 500)) &&
+             (!('cat' in data) || data.cat == null || (data.cat is string && data.cat.size() <= 100)) &&
+             (!('type' in data) || data.type == null || data.type in ['pemasukan', 'pengeluaran']) &&
+             (!('paymentMethod' in data) || data.paymentMethod == null || data.paymentMethod in ['tunai', 'kredit']) &&
+             (!('isPaid' in data) || data.isPaid == null || data.isPaid is bool) &&
+             (!('user' in data) || data.user == null || (data.user is string && data.user.size() <= 100));
+    }
+
+    // Auth Helpers
+    function isMemberOfLedger(lId) {
+      let ledgerPath = /databases/$(database)/documents/ledgers/$(lId);
+      return exists(ledgerPath) && request.auth.uid in get(ledgerPath).data.memberIds;
+    }
+
+    function isLedgerOwner(ledgerData) {
+      return ledgerData != null && 'ownerId' in ledgerData && request.auth.uid == ledgerData.ownerId;
+    }
+
+    match /ledgers/{ledgerId} {
+      allow get: if isSignedIn() && isValidId(ledgerId);
+      allow list: if isSignedIn() && 
+                     request.auth.uid in resource.data.memberIds;
+      
+      allow create: if isVerified() && isValidId(ledgerId) && isValidLedger(incoming());
+      
+      allow update: if isVerified() && isValidId(ledgerId) && 
+                    (
+                      // Action: Owner Update (Profile/Budget)
+                      (isLedgerOwner(existing()) && 
+                       incoming().diff(existing()).affectedKeys().hasOnly(['name', 'monthlyBudget', 'memberIds']) &&
+                       incoming().ownerId == existing().ownerId &&
+                       isLedgerUpdateValid(incoming())) 
+                      || 
+                      // Action: Join (Add self to members)
+                      (!isLedgerOwner(existing()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['memberIds']) &&
+                       incoming().memberIds.size() == existing().memberIds.size() + 1 &&
+                       request.auth.uid in incoming().memberIds &&
+                       !(request.auth.uid in existing().memberIds) &&
+                       incoming().ownerId == existing().ownerId &&
+                       incoming().name == existing().name &&
+                       incoming().monthlyBudget == existing().monthlyBudget
+                      )
+                    );
+                     
+      allow delete: if isVerified() && isValidId(ledgerId) && 
+                    isLedgerOwner(existing());
+
+      match /transactions/{transactionId} {
+        allow read: if isSignedIn() && isMemberOfLedger(ledgerId);
+        
+        allow create: if isVerified() && isValidId(ledgerId) && isValidId(transactionId) && 
+                      isMemberOfLedger(ledgerId) && 
+                      isValidTransaction(incoming());
+                      
+        allow update: if isVerified() && isValidId(ledgerId) && isValidId(transactionId) &&
+                      isMemberOfLedger(ledgerId) &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['date', 'amt', 'desc', 'cat', 'type', 'user', 'paymentMethod', 'isPaid']) &&
+                      isTransactionUpdateValid(incoming());
+                      
+        allow delete: if isVerified() && isValidId(ledgerId) && isValidId(transactionId) &&
+                      isMemberOfLedger(ledgerId);
+      }
+
+      match /plans/{planId} {
+        allow read: if isSignedIn() && isMemberOfLedger(ledgerId);
+        allow create: if isVerified() && isMemberOfLedger(ledgerId) && isValidId(planId);
+        allow update, delete: if isVerified() && isMemberOfLedger(ledgerId) && isValidId(planId);
+      }
+
+      match /savings_goals/{goalId} {
+        allow read: if isSignedIn() && isMemberOfLedger(ledgerId);
+        allow create: if isVerified() && isMemberOfLedger(ledgerId) && isValidId(goalId);
+        allow update, delete: if isVerified() && isMemberOfLedger(ledgerId) && isValidId(goalId);
+      }
+    }
+  }
+}
