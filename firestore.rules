@@ -72,11 +72,8 @@ service cloud.firestore {
 
     // Auth Helpers
     function isMemberOfLedger(lId) {
-      return exists(/databases/$(database)/documents/ledgers/$(lId)) &&
-             (
-               ('memberIds' in get(/databases/$(database)/documents/ledgers/$(lId)).data && request.auth.uid in get(/databases/$(database)/documents/ledgers/$(lId)).data.memberIds) ||
-               ('ownerId' in get(/databases/$(database)/documents/ledgers/$(lId)).data && request.auth.uid == get(/databases/$(database)/documents/ledgers/$(lId)).data.ownerId)
-             );
+      let ledgerRef = /databases/$(database)/documents/ledgers/$(lId);
+      return exists(ledgerRef) && request.auth.uid in get(ledgerRef).data.memberIds;
     }
 
     function isLedgerOwner(ledgerData) {
@@ -114,31 +111,31 @@ service cloud.firestore {
                     isLedgerOwner(existing());
 
       match /transactions/{transactionId} {
-        allow read: if isSignedIn() && isMemberOfLedger(ledgerId);
+        allow read: if request.auth != null;
         
-        allow create: if isVerified() && isValidId(ledgerId) && isValidId(transactionId) && 
+        allow create: if request.auth != null && isValidId(ledgerId) && isValidId(transactionId) && 
                       isMemberOfLedger(ledgerId) && 
                       isValidTransaction(incoming());
                       
-        allow update: if isVerified() && isValidId(ledgerId) && isValidId(transactionId) &&
+        allow update: if request.auth != null && isValidId(ledgerId) && isValidId(transactionId) &&
                       isMemberOfLedger(ledgerId) &&
                       incoming().diff(existing()).affectedKeys().hasOnly(['date', 'amt', 'desc', 'cat', 'type', 'user', 'paymentMethod', 'isPaid']) &&
                       isTransactionUpdateValid(incoming());
                       
-        allow delete: if isVerified() && isValidId(ledgerId) && isValidId(transactionId) &&
+        allow delete: if request.auth != null && isValidId(ledgerId) && isValidId(transactionId) &&
                       isMemberOfLedger(ledgerId);
       }
 
       match /plans/{planId} {
-        allow read: if isSignedIn() && isMemberOfLedger(ledgerId);
-        allow create: if isVerified() && isMemberOfLedger(ledgerId) && isValidId(planId);
-        allow update, delete: if isVerified() && isMemberOfLedger(ledgerId) && isValidId(planId);
+        allow read: if request.auth != null;
+        allow create: if request.auth != null && isMemberOfLedger(ledgerId) && isValidId(planId);
+        allow update, delete: if request.auth != null && isMemberOfLedger(ledgerId) && isValidId(planId);
       }
 
       match /savings_goals/{goalId} {
-        allow read: if isSignedIn() && isMemberOfLedger(ledgerId);
-        allow create: if isVerified() && isMemberOfLedger(ledgerId) && isValidId(goalId);
-        allow update, delete: if isVerified() && isMemberOfLedger(ledgerId) && isValidId(goalId);
+        allow read: if request.auth != null;
+        allow create: if request.auth != null && isMemberOfLedger(ledgerId) && isValidId(goalId);
+        allow update, delete: if request.auth != null && isMemberOfLedger(ledgerId) && isValidId(goalId);
       }
     }
   }

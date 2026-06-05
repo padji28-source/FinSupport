@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, signOut } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
@@ -17,11 +17,7 @@ export const isIframe = () => {
 
 export const signInWithGoogle = async () => {
   try {
-    if (isIframe()) {
-      await signInWithPopup(auth, googleProvider);
-    } else {
-      await signInWithRedirect(auth, googleProvider);
-    }
+    await signInWithPopup(auth, googleProvider);
   } catch (error: any) {
     if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
       console.log("Sign-in popup closed by user.");
