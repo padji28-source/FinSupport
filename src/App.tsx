@@ -270,7 +270,7 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `Data_Dompet_Keluarga_${format(new Date(), 'yyyyMMdd')}.csv`);
+    link.setAttribute("download", `Data_FinancialKita_${format(new Date(), 'yyyyMMdd')}.csv`);
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -871,11 +871,11 @@ export default function App() {
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ type: "spring", stiffness: 200, damping: 20 }}
-                className="w-24 h-24 bg-white/10 rounded-3xl backdrop-blur-sm flex items-center justify-center mb-6 shadow-2xl border border-white/20"
+                className="w-24 h-24 bg-white/10 rounded-3xl backdrop-blur-sm flex items-center justify-center mb-6 shadow-2xl border border-white/20 p-2"
               >
-                <PieChart className="w-12 h-12 text-white" />
+                <img src="/fk.png" alt="FinancialKita" className="w-full h-full object-contain" />
               </motion.div>
-              <h1 className="text-3xl font-black mb-2 tracking-tight">FinSuamiIstri</h1>
+              <h1 className="text-3xl font-black mb-2 tracking-tight">FinancialKita</h1>
               <p className="text-blue-200 text-sm font-medium tracking-wide">Pencatatan Keuangan Keluarga</p>
               
               <div className="absolute bottom-10 flex flex-col items-center gap-2">
@@ -900,10 +900,10 @@ export default function App() {
     return (
       <div className="flex flex-col min-h-screen sm:h-screen sm:py-4 bg-slate-100 sm:items-center sm:justify-center">
         <div className="w-full h-screen sm:h-[850px] sm:max-h-[90vh] sm:max-w-[400px] flex flex-col relative bg-blue-900 sm:rounded-[40px] sm:overflow-hidden sm:shadow-2xl p-8 items-center justify-center text-white">
-          <div className="w-24 h-24 bg-white/10 rounded-3xl backdrop-blur-sm flex items-center justify-center mb-6 shadow-2xl border border-white/20">
-             <PieChart className="w-12 h-12 text-white" />
+          <div className="w-24 h-24 bg-white/10 rounded-3xl backdrop-blur-sm flex items-center justify-center mb-6 shadow-2xl border border-white/20 p-2">
+             <img src="/fk.png" alt="FinancialKita" className="w-full h-full object-contain" />
           </div>
-          <h1 className="text-3xl font-black mb-2 tracking-tight">FinSuamiIstri</h1>
+          <h1 className="text-3xl font-black mb-2 tracking-tight">FinancialKita</h1>
           <p className="text-blue-200 text-sm font-medium tracking-wide mb-12 text-center">Silakan Masuk dengan Google untuk melanjutkan</p>
           <button 
             onClick={signInWithGoogle}
@@ -1037,7 +1037,7 @@ export default function App() {
             className="cursor-pointer active:scale-95 transition-transform"
           >
             <h2 className="text-xl font-bold mb-1 mt-6 flex items-center justify-center gap-2">
-              {selectedLedger?.name || 'Dompet Keluarga'}
+              {selectedLedger?.name || 'FinancialKita'}
               <ChevronLeft className="w-4 h-4 opacity-50" />
             </h2>
             <div className="bg-white/10 px-3 py-1 rounded-full backdrop-blur-sm inline-flex items-center gap-2 mb-4 hover:bg-white/20 transition-colors">
