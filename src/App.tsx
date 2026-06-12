@@ -53,7 +53,37 @@ const catStyles: Record<string, string> = {
   'Elektronik': '#fb923c',
   'Mobil': '#c084fc',
   'Membelai': '#2dd4bf',
-  'Kecantikan': '#a78bfa'
+  'Kecantikan': '#a78bfa',
+  'Tagihan': '#dc2626',
+  'Iuran': '#ea580c',
+  'Listrik': '#eab308',
+  'Dapur': '#16a34a',
+  'Paket Internet': '#2563eb',
+  'Freelance': '#9333ea',
+  'Jualan': '#059669',
+  'Minuman/Kopi': '#9f1239',
+  'Bensin': '#f59e0b'
+};
+
+const catIcons: Record<string, string> = {
+  'Makanan': '🍟', 
+  'Belanja': '🛍️', 
+  'Transport': '🚗', 
+  'Gaji': '💰', 
+  'Lainnya': '📦',
+  'Elektronik': '💻',
+  'Mobil': '🚙',
+  'Membelai': '💆',
+  'Kecantikan': '💅',
+  'Tagihan': '🧾',
+  'Iuran': '💸',
+  'Listrik': '⚡',
+  'Dapur': '🍳',
+  'Paket Internet': '🌐',
+  'Freelance': '💻',
+  'Jualan': '🏪',
+  'Minuman/Kopi': '☕',
+  'Bensin': '⛽'
 };
 
 enum OperationType {
@@ -435,9 +465,15 @@ export default function App() {
                    cat = 'Gaji'; 
                } else {
                    const d = desc.toLowerCase();
-                   if (/makan|food|jajan|kopi|grab|gojek|shopee/i.test(d)) cat = 'Makanan';
-                   else if (/listrik|air|internet|wifi|pulsa/i.test(d)) cat = 'Tagihan';
-                   else if (/bensin|tol|parkir|krl|bus/i.test(d)) cat = 'Transportasi';
+                   if (/kopi|minuman|starbucks|chatime/i.test(d)) cat = 'Minuman/Kopi';
+                   else if (/makan|food|jajan|grab|gojek|shopee/i.test(d)) cat = 'Makanan';
+                   else if (/listrik|token/i.test(d)) cat = 'Listrik';
+                   else if (/internet|wifi|kuota|data/i.test(d)) cat = 'Paket Internet';
+                   else if (/iuran|kas/i.test(d)) cat = 'Iuran';
+                   else if (/dapur|sayur|beras|minyak|pasar/i.test(d)) cat = 'Dapur';
+                   else if (/bensin|pertalite|pertamax|spbu|shell/i.test(d)) cat = 'Bensin';
+                   else if (/tol|parkir|krl|bus|transport|grab|gojek/i.test(d)) cat = 'Transport';
+                   else if (/tagihan|cicilan|bpjs/i.test(d)) cat = 'Tagihan';
                }
 
                const id = Date.now().toString() + Math.random().toString(36).substring(2, 9);
@@ -768,122 +804,141 @@ export default function App() {
     }
   };
 
-  const globalTunaiExp = db.filter(t => t.type === 'pengeluaran' && (t.paymentMethod !== 'kredit' || t.isPaid)).reduce((a, b) => a + b.amt, 0);
-  const globalKreditExp = db.filter(t => t.type === 'pengeluaran' && t.paymentMethod === 'kredit' && !t.isPaid).reduce((a, b) => a + b.amt, 0);
-  const globalInc = db.filter(t => t.type === 'pemasukan').reduce((a, b) => a + b.amt, 0);
-  const globalBalance = globalInc - globalTunaiExp;
+  const { globalTunaiExp, globalKreditExp, globalInc, globalBalance } = React.useMemo(() => {
+    const tunaiExp = db.filter(t => t.type === 'pengeluaran' && (t.paymentMethod !== 'kredit' || t.isPaid)).reduce((a, b) => a + b.amt, 0);
+    const kreditExp = db.filter(t => t.type === 'pengeluaran' && t.paymentMethod === 'kredit' && !t.isPaid).reduce((a, b) => a + b.amt, 0);
+    const inc = db.filter(t => t.type === 'pemasukan').reduce((a, b) => a + b.amt, 0);
+    return { globalTunaiExp: tunaiExp, globalKreditExp: kreditExp, globalInc: inc, globalBalance: inc - tunaiExp };
+  }, [db]);
 
-  const dateStr = format(currentDate, 'yyyy-MM-dd');
-  const dayData = db.filter(t => t.date === dateStr);
-  const dayExpSuami = dayData.filter(t => t.user === 'Suami' && t.type === 'pengeluaran').reduce((a, b) => a + b.amt, 0);
-  const dayExpIstri = dayData.filter(t => t.user === 'Istri' && t.type === 'pengeluaran').reduce((a, b) => a + b.amt, 0);
-  const dayExpTotal = dayExpSuami + dayExpIstri;
-  const dayIncTotal = dayData.filter(t => t.type === 'pemasukan').reduce((a, b) => a + b.amt, 0);
+  const { dayData, dayExpSuami, dayExpIstri, dayExpTotal, dayIncTotal, cats, viewTotal, chartData } = React.useMemo(() => {
+    const dateStr = format(currentDate, 'yyyy-MM-dd');
+    const dData = db.filter(t => t.date === dateStr);
+    const expSuami = dData.filter(t => t.user === 'Suami' && t.type === 'pengeluaran').reduce((a, b) => a + b.amt, 0);
+    const expIstri = dData.filter(t => t.user === 'Istri' && t.type === 'pengeluaran').reduce((a, b) => a + b.amt, 0);
+    const expTotal = expSuami + expIstri;
+    const incTotal = dData.filter(t => t.type === 'pemasukan').reduce((a, b) => a + b.amt, 0);
 
-  const viewData = dayData.filter(t => t.type === 'pengeluaran');
-  const cats: Record<string, number> = {};
-  viewData.forEach(t => {
-    cats[t.cat] = (cats[t.cat] || 0) + t.amt;
-  });
-  const viewTotal = Object.values(cats).reduce((a, b) => a + b, 0);
+    const viewData = dData.filter(t => t.type === 'pengeluaran');
+    const computedCats: Record<string, number> = {};
+    viewData.forEach(t => {
+      computedCats[t.cat] = (computedCats[t.cat] || 0) + t.amt;
+    });
+    const vTotal = Object.values(computedCats).reduce((a, b) => a + b, 0);
 
-  const chartData = {
-    labels: Object.keys(cats),
-    datasets: [{
-      data: Object.values(cats),
-      backgroundColor: Object.keys(cats).map(k => catStyles[k] || catStyles['Lainnya']),
-      borderWidth: 0,
-      cutout: '85%'
-    }]
-  };
+    const cData = {
+      labels: Object.keys(computedCats),
+      datasets: [{
+        data: Object.values(computedCats),
+        backgroundColor: Object.keys(computedCats).map(k => catStyles[k] || catStyles['Lainnya']),
+        borderWidth: 0,
+        cutout: '85%'
+      }]
+    };
+    return { dayData: dData, dayExpSuami: expSuami, dayExpIstri: expIstri, dayExpTotal: expTotal, dayIncTotal: incTotal, cats: computedCats, viewTotal: vTotal, chartData: cData };
+  }, [db, currentDate]);
 
   // This month data logic (for Home mainly)
-  const currentMonth = new Date().getMonth();
-  const currentYear = new Date().getFullYear();
-  const thisMonthData = db.filter(t => {
-    const d = new Date(t.date);
-    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-  });
-  const thisMonthExp = thisMonthData.filter(t => t.type === 'pengeluaran').reduce((a,b) => a+b.amt, 0);
-  const thisMonthInc = thisMonthData.filter(t => t.type === 'pemasukan').reduce((a,b) => a+b.amt, 0);
+  const { thisMonthExp, thisMonthInc } = React.useMemo(() => {
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    const thisMonthData = db.filter(t => {
+      const d = new Date(t.date);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
+    return {
+      thisMonthExp: thisMonthData.filter(t => t.type === 'pengeluaran').reduce((a,b) => a+b.amt, 0),
+      thisMonthInc: thisMonthData.filter(t => t.type === 'pemasukan').reduce((a,b) => a+b.amt, 0)
+    };
+  }, [db]);
 
   // Report data logic
-  const reportDate = new Date();
-  if (reportTime === 'lalu') {
-    reportDate.setMonth(reportDate.getMonth() - 1);
-  }
-  const reportMonth = reportDate.getMonth();
-  const reportYear = reportDate.getFullYear();
-  
-  const reportData = db.filter(t => {
-    const d = new Date(t.date);
-    return d.getMonth() === reportMonth && d.getFullYear() === reportYear;
-  });
-  
-  const reportExp = reportData.filter(t => t.type === 'pengeluaran').reduce((a,b) => a+b.amt, 0);
-  const reportInc = reportData.filter(t => t.type === 'pemasukan').reduce((a,b) => a+b.amt, 0);
-  const reportBudgetPercentage = monthlyBudget > 0 ? Math.min((reportExp / monthlyBudget) * 100, 100).toFixed(2) : '0';
-  const reportRemainingBudget = monthlyBudget - reportExp;
+  const { reportExp, reportInc, reportBudgetPercentage, reportRemainingBudget, reportDate } = React.useMemo(() => {
+    const reportDate = new Date();
+    if (reportTime === 'lalu') {
+      reportDate.setMonth(reportDate.getMonth() - 1);
+    }
+    const reportMonth = reportDate.getMonth();
+    const reportYear = reportDate.getFullYear();
+    
+    const rData = db.filter(t => {
+      const d = new Date(t.date);
+      return d.getMonth() === reportMonth && d.getFullYear() === reportYear;
+    });
+    
+    const rExp = rData.filter(t => t.type === 'pengeluaran').reduce((a,b) => a+b.amt, 0);
+    const rInc = rData.filter(t => t.type === 'pemasukan').reduce((a,b) => a+b.amt, 0);
+    const rBudgetPercentage = monthlyBudget > 0 ? Math.min((rExp / monthlyBudget) * 100, 100).toFixed(2) : '0';
+    const rRemainingBudget = monthlyBudget - rExp;
+
+    return { reportExp: rExp, reportInc: rInc, reportBudgetPercentage: rBudgetPercentage, reportRemainingBudget: rRemainingBudget, reportDate };
+  }, [db, reportTime, monthlyBudget]);
 
   // Stats data logic
-  const statsTargetDate = new Date();
-  if (statsTime === 'lalu') {
-    if (statsViewType === 'bulan') {
-      statsTargetDate.setMonth(statsTargetDate.getMonth() - 1);
-    } else {
-      statsTargetDate.setFullYear(statsTargetDate.getFullYear() - 1);
+  const { statsExpTotal, statsCategories, statsChartData } = React.useMemo(() => {
+    const statsTargetDate = new Date();
+    if (statsTime === 'lalu') {
+      if (statsViewType === 'bulan') {
+        statsTargetDate.setMonth(statsTargetDate.getMonth() - 1);
+      } else {
+        statsTargetDate.setFullYear(statsTargetDate.getFullYear() - 1);
+      }
     }
-  }
-  const statsTargetMonth = statsTargetDate.getMonth();
-  const statsTargetYear = statsTargetDate.getFullYear();
+    const statsTargetMonth = statsTargetDate.getMonth();
+    const statsTargetYear = statsTargetDate.getFullYear();
 
-  const statsFilteredData = db.filter(t => {
-    const d = new Date(t.date);
-    if (statsViewType === 'bulan') {
-      return d.getMonth() === statsTargetMonth && d.getFullYear() === statsTargetYear;
-    } else {
-      return d.getFullYear() === statsTargetYear;
-    }
-  });
+    const statsFilteredData = db.filter(t => {
+      const d = new Date(t.date);
+      if (statsViewType === 'bulan') {
+        return d.getMonth() === statsTargetMonth && d.getFullYear() === statsTargetYear;
+      } else {
+        return d.getFullYear() === statsTargetYear;
+      }
+    });
 
-  const statsExpTotal = statsFilteredData.filter(t => t.type === 'pengeluaran').reduce((a,b) => a+b.amt, 0);
-  const statsExpData = statsFilteredData.filter(t => t.type === 'pengeluaran');
-  const statsCategoryTotals: Record<string, number> = {};
-  statsExpData.forEach(t => {
-    statsCategoryTotals[t.cat] = (statsCategoryTotals[t.cat] || 0) + t.amt;
-  });
-  const statsCategories = Object.keys(statsCategoryTotals).map(k => {
-    const percent = statsExpTotal > 0 ? ((statsCategoryTotals[k] / statsExpTotal) * 100).toFixed(2) : '0';
-    return { name: k, amount: statsCategoryTotals[k], percent };
-  }).sort((a,b) => b.amount - a.amount);
+    const expTotal = statsFilteredData.filter(t => t.type === 'pengeluaran').reduce((a,b) => a+b.amt, 0);
+    const statsExpData = statsFilteredData.filter(t => t.type === 'pengeluaran');
+    const statsCategoryTotals: Record<string, number> = {};
+    statsExpData.forEach(t => {
+      statsCategoryTotals[t.cat] = (statsCategoryTotals[t.cat] || 0) + t.amt;
+    });
+    const sCategories = Object.keys(statsCategoryTotals).map(k => {
+      const percent = expTotal > 0 ? ((statsCategoryTotals[k] / expTotal) * 100).toFixed(2) : '0';
+      return { name: k, amount: statsCategoryTotals[k], percent };
+    }).sort((a,b) => b.amount - a.amount);
 
-  const statsChartData = {
-    labels: statsCategories.map(c => c.name),
-    datasets: [{
-      data: statsCategories.map(c => c.amount),
-      backgroundColor: statsCategories.map(c => catStyles[c.name] || '#94a3b8'),
-      borderWidth: 0,
-      cutout: '75%'
-    }]
-  };
+    const sChartData = {
+      labels: sCategories.map(c => c.name),
+      datasets: [{
+        data: sCategories.map(c => c.amount),
+        backgroundColor: sCategories.map(c => catStyles[c.name] || '#94a3b8'),
+        borderWidth: 0,
+        cutout: '75%'
+      }]
+    };
+    return { statsExpTotal: expTotal, statsCategories: sCategories, statsChartData: sChartData };
+  }, [db, statsTime, statsViewType]);
 
   // Group history by date
-  const filteredDb = db.filter(tx => {
-    const matchesSearch = tx.desc.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         tx.cat.toLowerCase().includes(searchQuery.toLowerCase());
-    const txDate = new Date(tx.date).getTime();
-    const matchesStartDate = startDate ? txDate >= new Date(startDate).getTime() : true;
-    const matchesEndDate = endDate ? txDate <= new Date(endDate).getTime() : true;
-    return matchesSearch && matchesStartDate && matchesEndDate;
-  });
+  const { sortedDates, groupedHistory } = React.useMemo(() => {
+    const filteredDb = db.filter(tx => {
+      const matchesSearch = tx.desc.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                           tx.cat.toLowerCase().includes(searchQuery.toLowerCase());
+      const txDate = new Date(tx.date).getTime();
+      const matchesStartDate = startDate ? txDate >= new Date(startDate).getTime() : true;
+      const matchesEndDate = endDate ? txDate <= new Date(endDate).getTime() : true;
+      return matchesSearch && matchesStartDate && matchesEndDate;
+    });
 
-  const groupedHistory = filteredDb.reduce((acc, tx) => {
-    if (!acc[tx.date]) acc[tx.date] = [];
-    acc[tx.date].push(tx);
-    return acc;
-  }, {} as Record<string, Transaction[]>);
+    const group = filteredDb.reduce((acc, tx) => {
+      if (!acc[tx.date]) acc[tx.date] = [];
+      acc[tx.date].push(tx);
+      return acc;
+    }, {} as Record<string, Transaction[]>);
 
-  const sortedDates = Object.keys(groupedHistory).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+    const sort = Object.keys(group).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+    return { sortedDates: sort, groupedHistory: group };
+  }, [db, searchQuery, startDate, endDate]);
 
   const createLedger = async () => {
     if (!newLedgerName || !user) return;
@@ -1057,6 +1112,7 @@ export default function App() {
                <input 
                   type="text"
                   placeholder="Nama Pencatatan (misal: Buku Rumah)"
+                  aria-label="Nama Pencatatan Baru"
                   className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl mb-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={newLedgerName}
                   onChange={e => setNewLedgerName(e.target.value)}
@@ -1072,6 +1128,7 @@ export default function App() {
                <input 
                   type="text"
                   placeholder="Masukkan Kode Buku"
+                  aria-label="Kode Buku yang akan digabung"
                   className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl mb-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                   value={joinLedgerId}
                   onChange={e => setJoinLedgerId(e.target.value)}
@@ -1313,7 +1370,7 @@ export default function App() {
                     <span className="font-bold text-gray-700 text-sm">{catName}</span>
                   </div>
                   <span className="font-black text-gray-800 text-sm">
-                    Rp {amount.toLocaleString('id-ID')}
+                    Rp {Number(amount).toLocaleString('id-ID')}
                   </span>
                 </motion.div>
               ))}
@@ -1471,7 +1528,12 @@ export default function App() {
               {/* Jenis Transaksi */}
               <div className="flex bg-gray-100 p-1 rounded-2xl">
                 <button 
-                  onClick={() => setInputType('pengeluaran')} 
+                  onClick={() => {
+                    setInputType('pengeluaran');
+                    if (['Gaji', 'Freelance', 'Jualan'].includes(inputCat)) {
+                      setInputCat('Makanan');
+                    }
+                  }} 
                   className={`flex-1 py-2 rounded-xl font-bold transition ${
                     inputType === 'pengeluaran' ? 'bg-white text-red-500 shadow-sm' : 'text-gray-400 hover:text-gray-600'
                   }`}
@@ -1479,7 +1541,12 @@ export default function App() {
                   PENGELUARAN
                 </button>
                 <button 
-                  onClick={() => setInputType('pemasukan')} 
+                  onClick={() => {
+                    setInputType('pemasukan');
+                    if (!['Gaji', 'Freelance', 'Jualan', 'Lainnya'].includes(inputCat)) {
+                      setInputCat('Gaji');
+                    }
+                  }} 
                   className={`flex-1 py-2 rounded-xl font-bold transition ${
                     inputType === 'pemasukan' ? 'bg-white text-green-500 shadow-sm' : 'text-gray-400 hover:text-gray-600'
                   }`}
@@ -1547,11 +1614,17 @@ export default function App() {
                     onChange={e => setInputCat(e.target.value)}
                     className="w-full bg-white border-[1.5px] border-gray-200 p-3 rounded-xl text-sm font-medium outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 transition-all"
                   >
-                    <option value="Makanan">🍟 Makanan</option>
-                    <option value="Belanja">🛍️ Belanja</option>
-                    <option value="Transport">🚗 Transport</option>
-                    <option value="Gaji">💰 Gaji/Bonus</option>
-                    <option value="Lainnya">📦 Lainnya</option>
+                    {Object.keys(catStyles)
+                      .filter(catName => 
+                        inputType === 'pemasukan' 
+                          ? ['Gaji', 'Freelance', 'Jualan', 'Lainnya'].includes(catName)
+                          : !['Gaji', 'Freelance', 'Jualan'].includes(catName)
+                      )
+                      .map(catName => (
+                      <option key={catName} value={catName}>
+                        {catIcons[catName] || '📦'} {catName}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -1665,7 +1738,7 @@ export default function App() {
                           <div className="flex justify-between items-center text-sm">
                              <div className="flex items-center gap-3">
                                <div className="w-9 h-9 rounded-full flex items-center justify-center text-white shadow-sm" style={{backgroundColor: catStyles[c.name] || '#ccc'}}>
-                                  <span className="text-xs font-bold">{c.name.charAt(0)}</span>
+                                  <span className="text-lg">{catIcons[c.name] || '📦'}</span>
                                </div>
                                <div className="flex items-center gap-2">
                                  <span className="font-bold text-gray-700">{c.name}</span>
@@ -2179,7 +2252,7 @@ export default function App() {
             </div>
             
             <div className="space-y-6 pb-10">
-              {filteredDb.length === 0 && (
+              {sortedDates.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-12 opacity-50">
                   <History className="w-12 h-12 text-gray-400 mb-3" />
                   <p className="text-center text-gray-500 font-medium text-sm">Tidak ada catatan ditemukan</p>
@@ -2222,7 +2295,7 @@ export default function App() {
                             <div className="flex flex-col min-w-0 pr-2">
                               <p className="font-bold text-gray-800 text-xs truncate">{t.desc}</p>
                               <p className="text-[9px] text-gray-400 font-bold uppercase mt-0 flex items-center gap-1.5 flex-wrap">
-                                <span>{t.cat}</span>
+                                <span>{catIcons[t.cat] ? `${catIcons[t.cat]} ${t.cat}` : t.cat}</span>
                                 {t.type === 'pengeluaran' && (
                                   <>
                                     <span>•</span>
@@ -2317,6 +2390,7 @@ export default function App() {
         <button 
           onClick={() => navigateToPage('add')} 
           className="flex flex-col items-center justify-center w-[20%] h-full -mt-6 group"
+          aria-label="Tambah Transaksi"
         >
           <motion.div 
             whileHover={{ scale: 1.05 }}
